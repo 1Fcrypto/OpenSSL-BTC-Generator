@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HexGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": "base.txt"
+    }
+  }
+}
