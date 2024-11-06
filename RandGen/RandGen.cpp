@@ -13,12 +13,12 @@ void RandAddSeed(bool fPerfmon = false);
 __int64 GetTime();
 
 
-typedef void DlgCallback(const char* key, size_t size_key, size_t inx);
+typedef void DlgCallback(const unsigned char* key, size_t size_key, size_t inx);
 
-std::vector<DlgCallback*> *_callback = 0;
-std::mutex m_callback;
+std::vector<DlgCallback*>* _callback = 0;
+std::mutex m_callback, m_init;
 
-void send_callback(const char* key, size_t size_key, size_t inx)
+void send_callback(const unsigned char* key, size_t size_key, size_t inx)
 {
 	std::unique_lock<std::mutex> lk(m_callback);
 	if (_callback != 0)
@@ -31,12 +31,15 @@ void run(const size_t total_keys, const char* out_file, bool flushToConsole = fa
 	BN_CTX* bn_ctx = BN_CTX_new();
 	BIGNUM* curve_order = BN_new();
 	BIGNUM* priv_key = BN_new();
-	EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_secp256k1);
-	const EC_GROUP* group = EC_KEY_get0_group(ec_key);
-	EC_GROUP_get_order(group, curve_order, bn_ctx);
-
+	EC_KEY* ec_key = 0;
+	{
+		std::unique_lock<std::mutex> lk(m_init);
+		ec_key = EC_KEY_new_by_curve_name(NID_secp256k1);
+		const EC_GROUP* group = EC_KEY_get0_group(ec_key);
+		EC_GROUP_get_order(group, curve_order, bn_ctx);
+	}
 	FILE* file = 0;
-	if(out_file != 0)
+	if (out_file != 0)
 		file = fopen(out_file, "a");
 
 	for (size_t n = 0; n < total_keys; n++) {
@@ -45,18 +48,15 @@ void run(const size_t total_keys, const char* out_file, bool flushToConsole = fa
 		BN_bn2bin(priv_key, bytes);
 		if (out_file != 0)
 			fprintf(file, "0x");
-		//printf("%02x", priv_key);
 		char* res = new char[255];
 		int pos = 0;
-		sprintf(res, "0x"); pos += 2;
 		for (int i = 0; i < 32; i++) {
 			if (out_file != 0)
 				fprintf(file, "%02x", bytes[i]);
-			if(flushToConsole)
+			if (flushToConsole)
 				printf("%02x", bytes[i]);
-			sprintf(&res[pos], "%02x", bytes[i]); pos += 2;
 		}
-		send_callback(res, strlen(res), n);
+		send_callback(bytes, 32, n);
 		delete[] res;
 
 		if (out_file != 0)
@@ -66,19 +66,35 @@ void run(const size_t total_keys, const char* out_file, bool flushToConsole = fa
 			fflush(stdout);
 		}
 	}
+
 	if (out_file != 0)
 		fclose(file);
+
 	EC_KEY_free(ec_key);
 	BN_CTX_free(bn_ctx);
 	BN_free(curve_order);
 	BN_free(priv_key);
+
 }
 
-extern "C" __declspec(dllexport) void SetCallback(DlgCallback callback)
+extern "C" __declspec(dllexport) void SetCallback(DlgCallback callback, bool add)
 {
 	std::unique_lock<std::mutex> lk(m_callback);
-	_callback->push_back(callback);
+	if (add)
+		_callback->push_back(callback);
+	else
+	{
+		for (auto i = _callback->begin(); i != _callback->end(); i++)
+		{
+			if ((*i) == callback) {
+				_callback->erase(i);
+				break;
+			}
+		}
+	}
 }
+
+
 extern "C" __declspec(dllexport) void Init()
 {
 	std::unique_lock<std::mutex> lk(m_callback);
@@ -90,7 +106,7 @@ extern "C" __declspec(dllexport) void Init()
 	RandAddSeed(true);
 }
 
-extern "C" __declspec(dllexport) void Run(size_t total_keys, const char *pathToFile, bool flushToConsole = false)
+extern "C" __declspec(dllexport) void Run(size_t total_keys, const char* pathToFile, bool flushToConsole)
 {
 	run(total_keys, pathToFile, flushToConsole);
 }
@@ -123,7 +139,7 @@ void RandAddSeed(bool fPerfmon)
 		nLastPerfmon = GetTime();
 
 		// Seed with the entire set of perfmon data
-		unsigned char *pdata = new unsigned char[250000];
+		unsigned char* pdata = new unsigned char[250000];
 		memset(pdata, 0, sizeof(pdata));
 		unsigned long nSize = sizeof(pdata);
 		long ret = RegQueryValueEx(HKEY_PERFORMANCE_DATA, L"Global", NULL, NULL, pdata, &nSize);

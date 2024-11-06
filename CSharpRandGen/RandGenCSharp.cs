@@ -4,16 +4,17 @@ namespace GeneratorBtcOpenSsl
 {
     internal static class NativeMethods
     {
-        public delegate void DlgCallback(IntPtr key, long size_key, long inx);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DlgCallback([In] IntPtr key, [In] long size_key, [In] long inx);
 
-        [DllImport("RandGen.dll")]
-        public static extern void Run(Int64 total_keys, IntPtr pathToFile, bool flushToConsole);
+        [DllImport("RandGen.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void Run([In] Int64 total_keys, [In] IntPtr pathToFile, [In] bool flushToConsole);
 
-        [DllImport("RandGen.dll")]
+        [DllImport("RandGen.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern void Init();
 
-        [DllImport("RandGen.dll")]
-        public static extern void SetCallback(DlgCallback callback);
+        [DllImport("RandGen.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SetCallback([MarshalAs(UnmanagedType.FunctionPtr)] DlgCallback callback, [In] bool add);
     }
 
     public class RandGenCSharp : IDisposable
@@ -28,24 +29,29 @@ namespace GeneratorBtcOpenSsl
         public RandGenCSharp()
         {
             callback = new(fun);
-            PrivKey = new List<string>();
+            PrivKey = new List<byte[]>();
         }
 
-        public List<string> PrivKey;
+        public List<byte[]> PrivKey;
 
         public void fun(IntPtr key, long size_key, long inx)
         {
-            var privkey = Marshal.PtrToStringAnsi(key);
-            privkey = privkey.TrimStart(['0', 'x']);
-            if (!string.IsNullOrEmpty(privkey))
-            {
-                PrivKey.Add(privkey);
-            }
+            byte[] btKey = new byte[size_key];
+            Marshal.Copy(key, btKey, (int)0, (int)size_key);
+            PrivKey.Add(btKey);
+
+            //var privkey = Marshal.PtrToStringAnsi(key);
+            //privkey = privkey.TrimStart(['0', 'x']);
+            //if (!string.IsNullOrEmpty(privkey))
+            //{
+            //    PrivKey.Add(privkey);
+            //}
         }
 
         public void Run()
         {
             NativeMethods.Run(_total_keys, string.IsNullOrEmpty(_pathToFile) ? IntPtr.Zero : Marshal.StringToHGlobalAnsi(_pathToFile), _flushToConsole);
+            NativeMethods.SetCallback(callback, false);
         }
 
         public void Init(Int64 total_keys, string? pathToFile, bool flushToConsole)
@@ -54,12 +60,15 @@ namespace GeneratorBtcOpenSsl
             _pathToFile = pathToFile;
             _flushToConsole = flushToConsole;
 
-            if (!_isInit)
+            lock (nameof(RandGenCSharp))
             {
-                _isInit = true;
-                NativeMethods.Init();
+                if (!_isInit)
+                {
+                    _isInit = true;
+                    NativeMethods.Init();
+                }
+                NativeMethods.SetCallback(callback, true);
             }
-            NativeMethods.SetCallback(callback);
         }
 
         public void Dispose()

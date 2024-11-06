@@ -1,6 +1,7 @@
 ﻿using CSharpRandGen;
 using Donate;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -114,18 +115,19 @@ namespace HexGenerator
             }
         }
 
-        public static void ProcessHexList(IEnumerable<string> hexList)
+        public static void ProcessHexList(IEnumerable<byte[]> hexList)
         {
             foreach (var hex in hexList)
             {
+                var hexStr = BytesToHexString(hex);
                 Interlocked.Increment(ref TotalHex);
-                var uncompressedHash160 = _secp256k1.PrivateKeyToH160(0, false, hex);
-                var compressedHash160 = _secp256k1.PrivateKeyToH160(0, true, hex);
-                var p2shHash160 = _secp256k1.PrivateKeyToH160(1, true, hex);
+                var uncompressedHash160 = _secp256k1.PrivateKeyToH160(0, false, hexStr);
+                var compressedHash160 = _secp256k1.PrivateKeyToH160(0, true, hexStr);
+                var p2shHash160 = _secp256k1.PrivateKeyToH160(1, true, hexStr);
 
-                Check(HasBalance(uncompressedHash160), uncompressedHash160, hex);
-                Check(HasBalance(compressedHash160), compressedHash160, hex);
-                Check(HasBalance(p2shHash160), p2shHash160, hex);
+                Check(HasBalance(uncompressedHash160), uncompressedHash160, hexStr);
+                Check(HasBalance(compressedHash160), compressedHash160, hexStr);
+                Check(HasBalance(p2shHash160), p2shHash160, hexStr);
             }
         }
 
@@ -168,7 +170,7 @@ namespace HexGenerator
                 Console.WriteLine("\n" + contents);
                 lock (outFileLock)
                 {
-                    using (StreamWriter writer = new StreamWriter("______FIND_____.txt", true))
+                    using (StreamWriter writer = new StreamWriter("FIND.txt", true))
                     {
                         writer.WriteLine(contents);
                     }
