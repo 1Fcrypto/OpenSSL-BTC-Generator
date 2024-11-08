@@ -1,7 +1,6 @@
 ﻿using CSharpRandGen;
 using Donate;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -138,7 +137,7 @@ namespace HexGenerator
                 if (readLine.StartsWith("1") || readLine.StartsWith("3"))
                 {
                     baseAddr.Add(AddressToHash160Bytes(readLine));
-                }    
+                }
 
             }
         }
