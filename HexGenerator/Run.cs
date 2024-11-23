@@ -69,7 +69,7 @@ namespace HexGenerator
                         lastTotalHex = currentTotalHex;
                         lastTotalCheck = currentTotalCheck;
 
-                        Console.Write("\rT_HEX:{0:N0} | T_ADDR:{1:N0} | HEX k/s:{3:N0} | ADDR k/s:{4:N0} | T:{2}",
+                        Console.Write("\rTot_Hex: {0:N0} | Tot_Addr: {1:N0} | HEX_GEN k/s: {3:N0} | CHECK_ADDR k/s: {4:N0} | T: {2}",
                             TotalHex, TotalCheck,
                             String.Format("{0}:{1}:{2}", diff.Hours, diff.Minutes, diff.Seconds),
                             hexKeysPerSecond, checkKeysPerSecond);
@@ -122,11 +122,11 @@ namespace HexGenerator
                 Interlocked.Increment(ref TotalHex);
                 var uncompressedHash160 = _secp256k1.PrivateKeyToH160(0, false, hexStr);
                 var compressedHash160 = _secp256k1.PrivateKeyToH160(0, true, hexStr);
-                //var p2shHash160 = _secp256k1.PrivateKeyToH160(1, true, hexStr);
+                var p2shHash160 = _secp256k1.PrivateKeyToH160(1, true, hexStr);
 
                 Check(HasBalance(uncompressedHash160), uncompressedHash160, hexStr);
                 Check(HasBalance(compressedHash160), compressedHash160, hexStr);
-                //Check(HasBalance(p2shHash160), p2shHash160, hexStr);
+                Check(HasBalance(p2shHash160), p2shHash160, hexStr);
             }
         }
 
